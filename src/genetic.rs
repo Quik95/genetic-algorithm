@@ -1,15 +1,14 @@
 use crate::chromosome::Chromosome;
 use crate::problem::Problem;
 use itertools::Itertools;
+use num::cast::AsPrimitive;
 use rand::prelude::SliceRandom;
 use rand::{thread_rng, Rng};
-use std::fmt::Debug;
 
 pub struct GeneticAlgorithm<T: Problem> {
     population_size: u32,
     problem: T,
     fitness_target: Option<T::Fitness>,
-    genotype: fn() -> Vec<T::Allele>,
     mutation_rate: f32,
 }
 
@@ -20,29 +19,35 @@ impl<T: Problem> GeneticAlgorithm<T> {
 
     fn evolve(&self) -> Chromosome<T> {
         let mut population = (0..self.population_size)
-            .map(|_| Chromosome::new((self.genotype)()))
+            .map(|_| Chromosome::new(T::genotype()))
             .collect_vec();
 
-        let mut i = 0;
+        let mut generation = 0;
+        let mut last_max_fitness = 0.0;
+        let mut temperature: f32 = 0.0;
         loop {
-            i += 1;
-
             population = self.evaluate(population);
 
             let best = population.first().unwrap();
             let best_fitness = best.get_fitness();
-            if i % 1000 == 0 {
+
+            temperature = 0.8 * (temperature + (best_fitness.as_() - last_max_fitness));
+
+            if generation % 1000 == 0 {
                 print!("Current best: {best_fitness:?}",);
                 println!(" {}", best.genes.iter().map(ToString::to_string).join(""));
             }
 
-            if self.problem.terminate(&population) {
+            if self.problem.terminate(&population, generation, temperature) {
                 return best.clone();
             }
 
             let parents = Self::selection(population);
             population = Self::crossover(parents);
             population = Self::mutate(population, self.mutation_rate);
+
+            last_max_fitness = best_fitness.as_();
+            generation += 1;
         }
     }
 
@@ -102,10 +107,9 @@ impl<T: Problem> GeneticAlgorithm<T> {
 
 pub struct GeneticBuilder<T: Problem> {
     fitness_target: Option<T::Fitness>,
-    genotype: Option<fn() -> Vec<T::Allele>>,
-    population_size: Option<u32>,
     problem: Option<T>,
-    mutation_rate: Option<f32>,
+    population_size: u32,
+    mutation_rate: f32,
 }
 
 impl<T: Problem> GeneticBuilder<T> {
@@ -121,14 +125,8 @@ impl<T: Problem> GeneticBuilder<T> {
     }
 
     #[must_use]
-    pub fn with_genotype(mut self, genotype: fn() -> Vec<T::Allele>) -> Self {
-        self.genotype = Some(genotype);
-        self
-    }
-
-    #[must_use]
     pub const fn with_population_size(mut self, population_size: u32) -> Self {
-        self.population_size = Some(population_size);
+        self.population_size = population_size;
         self
     }
 
@@ -140,26 +138,24 @@ impl<T: Problem> GeneticBuilder<T> {
 
     #[must_use]
     pub const fn with_mutation_rate(mut self, mutation_rate: f32) -> Self {
-        self.mutation_rate = Some(mutation_rate);
+        self.mutation_rate = mutation_rate;
         self
     }
 
-    /// Build a GeneticAlgorithm
+    /// Build a `GeneticAlgorithm`
     ///
     /// # Panics
-    /// Will panic if either `genotype` or `problem` are not set.
+    /// Will panic if `problem` is not set.
     #[must_use]
     pub fn build(self) -> GeneticAlgorithm<T> {
-        assert!(self.genotype.is_some(), "genotype is required");
         assert!(self.problem.is_some(), "problem is required");
 
         GeneticAlgorithm {
-            genotype: self.genotype.unwrap(),
             problem: self.problem.unwrap(),
 
             fitness_target: self.fitness_target,
-            population_size: self.population_size.unwrap_or(100),
-            mutation_rate: self.mutation_rate.unwrap_or(0.05),
+            population_size: self.population_size,
+            mutation_rate: self.mutation_rate,
         }
     }
 }
@@ -168,10 +164,9 @@ impl<T: Problem> Default for GeneticBuilder<T> {
     fn default() -> Self {
         Self {
             fitness_target: None,
-            genotype: None,
-            population_size: None,
             problem: None,
-            mutation_rate: None,
+            population_size: 100,
+            mutation_rate: 0.05,
         }
     }
 }

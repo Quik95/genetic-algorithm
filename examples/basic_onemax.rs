@@ -17,7 +17,7 @@ fn main() {
     loop {
         let best: u32 = population
             .iter()
-            .map(|g| g.iter().map(|&g| g as u32).sum())
+            .map(|g| g.iter().map(|&g| u32::from(g)).sum())
             .max()
             .unwrap();
         print!("\rCurrent best: {best}");
@@ -34,13 +34,13 @@ fn main() {
 
     print!(
         "\nAnswer is: {}",
-        population[0].iter().map(|&g| g as u32).sum::<u32>()
+        population[0].iter().map(|&g| u32::from(g)).sum::<u32>()
     );
 }
 
 fn evaluate(p: Population) -> Population {
     p.into_iter()
-        .map(|g| (g.iter().map(|&g| g as u32).sum::<u32>(), g))
+        .map(|g| (g.iter().map(|&g| u32::from(g)).sum::<u32>(), g))
         .sorted_by_key(|x| x.0)
         .map(|(_sum, genome)| genome)
         .rev()
