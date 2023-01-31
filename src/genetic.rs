@@ -34,8 +34,7 @@ impl<T: Problem> GeneticAlgorithm<T> {
             temperature = 0.8 * (temperature + (best_fitness.as_() - last_max_fitness));
 
             if generation % 1000 == 0 {
-                print!("Current best: {best_fitness:?}",);
-                println!(" {}", best.genes.iter().map(ToString::to_string).join(""));
+                println!("Current best: {best_fitness:?}",);
             }
 
             if self.problem.terminate(&population, generation, temperature) {
