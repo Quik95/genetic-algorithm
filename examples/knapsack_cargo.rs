@@ -1,10 +1,11 @@
 use genetic_algorithm::chromosome::Chromosome;
 use genetic_algorithm::genetic::GeneticBuilder;
 use genetic_algorithm::problem::Problem;
+use genetic_algorithm::selection::Selection;
 use itertools::Itertools;
 use rand::{thread_rng, Rng};
 
-#[derive(Debug, Clone)]
+#[derive(Eq, PartialEq, Hash, Debug, Default, Clone)]
 struct Cargo {
     profits: Vec<u8>,
     weights: Vec<u8>,
@@ -44,7 +45,7 @@ impl Problem for Cargo {
         &self,
         _population: &[Chromosome<Self>],
         generation: u32,
-        _temperature: f32,
+        _temperature: f64,
     ) -> bool {
         generation == 1_000_000
     }
@@ -63,6 +64,7 @@ fn main() {
 
     let g = GeneticBuilder::new()
         .with_population_size(50)
+        .with_selection_strategy(Selection::TournamentWithDuplicates)
         .with_problem(instance.clone())
         .build();
 

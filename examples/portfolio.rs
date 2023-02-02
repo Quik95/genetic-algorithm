@@ -1,11 +1,12 @@
 use genetic_algorithm::chromosome::Chromosome;
 use genetic_algorithm::genetic::GeneticBuilder;
 use genetic_algorithm::problem::Problem;
+use genetic_algorithm::selection::Selection;
 use itertools::Itertools;
 use rand::{thread_rng, Rng};
 use std::fmt::{Display, Formatter};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Default, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
 struct Stock {
     pub roi: u8,
     pub risk: u8,
@@ -25,7 +26,7 @@ impl Display for Stock {
 
 const TARGET_FITNESS: isize = 180;
 
-#[derive(Debug, Clone)]
+#[derive(Eq, PartialEq, Hash, Default, Debug, Clone)]
 struct Portfolio {}
 impl Problem for Portfolio {
     type Fitness = isize;
@@ -43,7 +44,7 @@ impl Problem for Portfolio {
         &self,
         population: &[Chromosome<Self>],
         _generation: u32,
-        _temperature: f32,
+        _temperature: f64,
     ) -> bool {
         population.iter().any(|c| c.get_fitness() > TARGET_FITNESS)
     }
@@ -59,6 +60,7 @@ fn main() {
     let g = GeneticBuilder::new()
         .with_population_size(20)
         .with_problem(Portfolio {})
+        .with_selection_strategy(Selection::Elitism)
         .build();
     let best = g.run();
     println!("Fitness: {}", best.get_fitness());

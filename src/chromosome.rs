@@ -1,7 +1,7 @@
 use crate::problem::Problem;
 use std::fmt::Debug;
 
-#[derive(Debug, Clone)]
+#[derive(Hash, Eq, PartialEq, Debug, Clone)]
 pub struct Chromosome<T: Problem + ?Sized> {
     pub genes: Vec<T::Allele>,
     fitness: Option<T::Fitness>,

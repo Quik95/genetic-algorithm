@@ -1,10 +1,11 @@
 use genetic_algorithm::chromosome::Chromosome;
 use genetic_algorithm::genetic::GeneticBuilder;
 use genetic_algorithm::problem::Problem;
+use genetic_algorithm::selection::Selection;
 use itertools::Itertools;
 use rand::{thread_rng, Rng};
 
-#[derive(Clone, Debug)]
+#[derive(Eq, PartialEq, Hash, Default, Clone, Debug)]
 struct OneMax;
 impl Problem for OneMax {
     type Fitness = usize;
@@ -18,7 +19,7 @@ impl Problem for OneMax {
         &self,
         population: &[Chromosome<Self>],
         _generation: u32,
-        _temperature: f32,
+        _temperature: f64,
     ) -> bool {
         population.iter().any(|c| self.fitness(c) == 42)
     }
@@ -33,6 +34,7 @@ fn main() {
         .with_fitness_target(42)
         .with_population_size(100)
         .with_problem(OneMax)
+        .with_selection_strategy(Selection::Elitism)
         .build();
 
     let result = genetic.run();
