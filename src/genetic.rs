@@ -1,4 +1,8 @@
 use crate::chromosome::Chromosome;
+use crate::crossover::order_one::OrderOne;
+use crate::crossover::single_point::SinglePoint;
+use crate::crossover::uniform::Uniform;
+use crate::crossover::{Crossover, CrossoverStrategy};
 use crate::problem::Problem;
 use crate::selection::elitism::ElitistSelection;
 use crate::selection::random::RandomSelection;
@@ -18,6 +22,7 @@ pub struct GeneticAlgorithm<T: Problem> {
     mutation_rate: f32,
     selection_rate: f32,
     selection_strategy: Box<dyn SelectionStrategy<T>>,
+    crossover_strategy: Box<dyn CrossoverStrategy<T>>,
 }
 
 impl<T: Problem + 'static> GeneticAlgorithm<T> {
@@ -57,7 +62,7 @@ impl<T: Problem + 'static> GeneticAlgorithm<T> {
 
             let (parents, mut leftover) = self.selection(population, n);
 
-            population = Self::crossover(parents);
+            population = self.crossover(parents);
             population.append(&mut leftover);
             while population.len() < self.population_size as usize {
                 population.push(Chromosome::new(T::genotype()));
@@ -111,19 +116,13 @@ impl<T: Problem + 'static> GeneticAlgorithm<T> {
         (parents, leftover)
     }
 
-    fn crossover(g: Vec<Option<(Chromosome<T>, Chromosome<T>)>>) -> Vec<Chromosome<T>> {
+    fn crossover(&self, g: Vec<Option<(Chromosome<T>, Chromosome<T>)>>) -> Vec<Chromosome<T>> {
         let length = g.len();
 
         g.into_iter()
             .fold(Vec::with_capacity(length * 2), |mut acc, t| {
                 if let Some((mut father, mut mother)) = t {
-                    let cx_point = thread_rng().gen_range(0..father.get_size());
-
-                    let mut father_split = father.genes.split_off(cx_point);
-                    let mut mother_split = mother.genes.split_off(cx_point);
-
-                    father.genes.append(&mut mother_split);
-                    mother.genes.append(&mut father_split);
+                    let (father, mother) = self.crossover_strategy.crossover(father, mother);
 
                     acc.push(father);
                     acc.push(mother);
@@ -149,6 +148,7 @@ pub struct GeneticBuilder<T: Problem> {
     fitness_target: Option<T::Fitness>,
     problem: Option<T>,
     selection_strategy: Option<Box<dyn SelectionStrategy<T>>>,
+    crossover_strategy: Option<Box<dyn CrossoverStrategy<T>>>,
 
     population_size: u32,
     mutation_rate: f32,
@@ -209,10 +209,22 @@ impl<T: Problem + 'static> GeneticBuilder<T> {
         self
     }
 
+    #[must_use]
+    #[allow(clippy::box_default)]
+    pub fn with_crossover_strategy(mut self, crossover_strategy: Crossover) -> Self {
+        self.crossover_strategy = match crossover_strategy {
+            Crossover::OrderOne => Some(Box::new(OrderOne::default())),
+            Crossover::Uniform(crossover_rate) => Some(Box::new(Uniform::new(crossover_rate))),
+            Crossover::SinglePoint => Some(Box::new(SinglePoint::default())),
+        };
+
+        self
+    }
+
     /// Build a `GeneticAlgorithm`
     ///
     /// # Panics
-    /// Will panic if either `problem` or `selection_strategy` is not set.
+    /// Will panic if either `problem`, `selection_strategy` or `crossover_strategy` is not set.
     #[must_use]
     pub fn build(self) -> GeneticAlgorithm<T> {
         assert!(self.problem.is_some(), "problem is required");
@@ -220,10 +232,15 @@ impl<T: Problem + 'static> GeneticBuilder<T> {
             self.selection_strategy.is_some(),
             "selection_strategy is required"
         );
+        assert!(
+            self.crossover_strategy.is_some(),
+            "crossover_strategy is required"
+        );
 
         GeneticAlgorithm {
             problem: self.problem.unwrap(),
             selection_strategy: self.selection_strategy.unwrap(),
+            crossover_strategy: self.crossover_strategy.unwrap(),
 
             fitness_target: self.fitness_target,
             population_size: self.population_size,
@@ -239,6 +256,7 @@ impl<T: Problem> Default for GeneticBuilder<T> {
             fitness_target: None,
             problem: None,
             selection_strategy: None,
+            crossover_strategy: None,
 
             population_size: 100,
             mutation_rate: 0.05,
